@@ -6,13 +6,11 @@ import numpy as np
 #import open3d.visualization.gui as gui
 import cv2
 
-from visualize_reID.utils import load_camera_params
-from visualize_reID.utils import unfold_camera_param
-from visualize_reID.visualize import project_to_views
+from visualize_reid.utils import load_camera_params
+from visualize_reid.utils import unfold_camera_param
+from visualize_reid.visualize import project_to_views
 
-#DATA_DIR = "D:\Doc\Desktop\\bodytracking"
 DATA_DIR = "/home/ana/Downloads/bodytracking"
-# DATA_DIR = "/home/ana/Downloads/debug_output"
 CAMERAS = ["cn01", "cn02", "cn04", "cn05", "cn06"]
 
 
@@ -29,13 +27,6 @@ def calculate_inverse_projection_params(params):
     return K_inv, R_t, T_inv
 
 
-# def convert_to_hom_coords(px_coords):
-#     for point in px_coords:
-#         point.append(1)
-#     px_coords = np.array(px_coords)
-#     return px_coords
-
-
 def convert_to_hom_coords(point):
     point.append(1)
     return point
@@ -48,19 +39,11 @@ def project_pixel_in_3D(cameras, px_coords, frame_id):
         fpath = os.path.join(DATA_DIR, cam, f"{file_id}_rgbd.tiff")
         depth_mask = cv2.imread(fpath,
                           cv2.IMREAD_UNCHANGED)
-        # sliced = depth_mask[1212:1525, 268:835]
-        # sliced = depth_mask[675:970, 285:976]
-        # sliced_filtered = sliced[sliced > 0]
-        # av_depth = np.average(sliced)
-        # #sliced2 = sliced[:, 268:835]
-
+       
         norm_img = np.zeros((1536, 2048))
         if px_coords[i][1] > 1536 or px_coords[i][0] > 2048:
             continue
         depth_mask_norm = cv2.normalize(depth_mask, norm_img, 0, 255, cv2.NORM_MINMAX)
-        # cv2.circle(depth_mask_norm, (px_coords[i][0], px_coords[i][1]), 5, (255, 255, 255), 5)
-        # cv2.imshow("", depth_mask_norm)
-        #cv2.waitKey()
         cv2.imwrite(f"/home/ana/Downloads/bodytracking/depth_{cam}.tiff", depth_mask_norm)
 
         depth = depth_mask[px_coords[i][1]][px_coords[i][0]]
@@ -74,30 +57,20 @@ def project_pixel_in_3D(cameras, px_coords, frame_id):
         world_points.append(cam_to_world)
 
     return world_points
-    # return cam_to_world
-
-# def project_pixel_in_3D(px_coords, frame_id):
-#     world_points = list()
-#     for i, cam in enumerate(CAMERAS[:]):
-#         file_id = str(frame_id).zfill(10)
-#         fpath = os.path.join(DATA_DIR, cam, f"{file_id}_rgbd.tiff")
-#         depth_mask = cv2.imread(fpath,
-#                           cv2.IMREAD_GRAYSCALE)
-#         depth = depth_mask[px_coords[i][1]][px_coords[i][0]]
-#         #depth -= 1e-5
-#         params = load_camera_params(cam, DATA_DIR)
-#         K_inv, R_t, T_inv = calculate_inverse_projection_params(params)
-#         px_to_cam = K_inv @ px_coords[i] * depth
-#         cam_to_world = R_t @ px_to_cam + T_inv
-#         world_points.append(cam_to_world)
-#
-#     return world_points
 
 
 def fuse_world_points(world_pts):
-    # TODO
-    point = np.array([0.265301, -0.963982, 0.005958])
-    return point.reshape(1,3)
+  if len(world_pts) == 0:
+        print("error: there are no world points to fuse!")
+        return None
+
+    if len(world_pts) == 1:
+        return world_pts[0]
+
+    sum = np.sum(world_pts, axis=0)
+    fused_point = sum / len(world_pts)
+    return fused_point
+
 
 
 def id_is_present(id, element):
@@ -128,7 +101,6 @@ def update_information(id, information, optimized_2D_centers):
         else:
             if optimized_center is not None:
                 information[cam].append((id, optimized_center, [(0, 0), (0, 0)]))
-#   return information
 
 
 def retrieve_center(id, element):
@@ -154,7 +126,7 @@ def optimize_detection_centers(information, global_ids, frame_id):
         optimized_center = fuse_world_points(world_pts)
         optimized_2D_centers = project_to_views(optimized_center, frame_id)
         update_information(global_ids[i], information, optimized_2D_centers)
-#    return information
+
 
 
 if __name__ == "__main__":

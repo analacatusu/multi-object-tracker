@@ -47,7 +47,7 @@ from utils.transforms import get_multi_scale_size
 from utils.transforms import up_interpolate
 
 
-from visualize_reID.visualize_3D_reprojections import construct_world_points, visualize, fuse_world_points, reproject_pixel_in_3D
+from visualize_reid.visualize_3D_reprojections import construct_world_points, visualize, fuse_world_points, reproject_pixel_in_3D
 
 CTX = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -90,6 +90,11 @@ CROWDPOSE_KEYPOINT_INDEXES = {
     13: 'neck'
 }
 
+INPUT_DIR = "/home/anaml/bodytracking/"
+OUTPUT_DIR = "/home/anaml/DEKR/output/"
+POSE_DIR = "/home/anaml/DEKR/output/pose/"
+CAMERAS = ["cn01","cn02", "cn03", "cn04", "cn05", "cn06"]
+INDEX = 0
 
 def get_pose_estimation_prediction(cfg, model, image, vis_thre, transforms):
     # size at scale 1.0
@@ -170,8 +175,6 @@ def parse_args():
     args.prevModelDir = ''
     return args
 
-POSE_DIR = "/home/ana/PycharmProjects/DEKR/output/pose/"
-
 
 def main(image_path, camera):
     # transformation
@@ -188,7 +191,6 @@ def main(image_path, camera):
 
     args = parse_args()
     update_config(cfg, args)
-    # pose_dir = prepare_output_dirs(args.outputDir)
     pose_dir = POSE_DIR
     csv_output_rows = []
 
@@ -206,7 +208,6 @@ def main(image_path, camera):
     pose_model.to(CTX)
     pose_model.eval()
 
-    # image_path = "/home/ana/Downloads/bodytracking/cn06/0000001755_color.jpg"
     image_bgr = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
     image_debug = image_bgr.copy()
     image_rgb = cv2.imread(image_path, cv2.IMREAD_COLOR)
@@ -214,7 +215,7 @@ def main(image_path, camera):
 
     pose_preds = get_pose_estimation_prediction(
                  cfg, pose_model, image_pose, args.visthre, transforms=pose_transform)
-    #new_csv_row = []
+
     for coords in pose_preds:
     # Draw each point on image
         new_csv_row = []
@@ -226,22 +227,14 @@ def main(image_path, camera):
         cv2.putText(image_debug, "", (100, 50), cv2.FONT_HERSHEY_SIMPLEX,
                    1, (0, 0, 255), 2, cv2.LINE_AA)
 
-    # csv_output_rows.append(new_csv_row)
-    # csv_output_rows.append(all_csv_rows)
     new_path = os.path.join(image_path.split('/')[-2],image_path.split('/')[-1])
     img_file = os.path.join(pose_dir, new_path)
     cv2.imwrite(img_file, image_debug)
-    # outcap.write(image_debug)
 
-    # write csv
-    # csv_headers = ['frame']
     csv_headers = []
     if cfg.DATASET.DATASET_TEST == 'coco':
         for keypoint in COCO_KEYPOINT_INDEXES.values():
             csv_headers.extend([keypoint+'_x', keypoint+'_y'])
-    # elif cfg.DATASET.DATASET_TEST == 'crowd_pose':
-    #     for keypoint in CROWDPOSE_KEYPOINT_INDEXES.values():
-    #         csv_headers.extend([keypoint+'_x', keypoint+'_y'])
     else:
         raise ValueError('Please implement keypoint_index for new dataset: %s.' % cfg.DATASET.DATASET_TEST)
 
@@ -251,131 +244,9 @@ def main(image_path, camera):
         csvwriter.writerow(csv_headers)
         csvwriter.writerows(csv_output_rows)
 
-    # vidcap.release()
-    # outcap.release()
-
     cv2.destroyAllWindows()
 
     return img_file
-
-
-def old_main():
-    # transformation
-    pose_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225]),
-    ])
-
-    # cudnn related setting
-    cudnn.benchmark = cfg.CUDNN.BENCHMARK
-    torch.backends.cudnn.deterministic = cfg.CUDNN.DETERMINISTIC
-    torch.backends.cudnn.enabled = cfg.CUDNN.ENABLED
-
-    args = parse_args()
-    update_config(cfg, args)
-    pose_dir = prepare_output_dirs(args.outputDir)
-    csv_output_rows = []
-
-    pose_model = eval('models.'+cfg.MODEL.NAME+'.get_pose_net')(
-        cfg, is_train=False
-    )
-
-    if cfg.TEST.MODEL_FILE:
-        print('=> loading model from {}'.format(cfg.TEST.MODEL_FILE))
-        pose_model.load_state_dict(torch.load(
-            cfg.TEST.MODEL_FILE), strict=False)
-    else:
-        raise ValueError('expected model defined in config at TEST.MODEL_FILE')
-
-    pose_model.to(CTX)
-    pose_model.eval()
-
-    # Loading an video
-    vidcap = cv2.VideoCapture(args.videoFile)
-    fps = vidcap.get(cv2.CAP_PROP_FPS)
-    if fps < args.inferenceFps:
-        raise ValueError('desired inference fps is ' +
-                         str(args.inferenceFps)+' but video fps is '+str(fps))
-    print(f"fps=",{fps})
-    print(f"argsFps=",{args.inferenceFps})
-    skip_frame_cnt = round(fps / args.inferenceFps / 2)
-    print(f"skip_frame_cnt=",{skip_frame_cnt})
-    frame_width = int(vidcap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(vidcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    outcap = cv2.VideoWriter('{}/{}_pose.avi'.format(args.outputDir, os.path.splitext(os.path.basename(args.videoFile))[0]),
-                             cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), int(skip_frame_cnt), (frame_width, frame_height))
-
-    count = 0
-    while vidcap.isOpened():
-        total_now = time.time()
-        ret, image_bgr = vidcap.read()
-        count += 1
-
-        if not ret:
-            break
-
-        if count % skip_frame_cnt != 0:
-            continue
-
-        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-
-        image_pose = image_rgb.copy()
-
-        # Clone 1 image for debugging purpose
-        image_debug = image_bgr.copy()
-
-        now = time.time()
-        pose_preds = get_pose_estimation_prediction(
-            cfg, pose_model, image_pose, args.visthre, transforms=pose_transform)
-        then = time.time()
-        if len(pose_preds) == 0:
-            count += 1
-            continue
-
-        print("Find person pose in: {} sec".format(then - now))
-
-        # new_csv_row = []
-        for coords in pose_preds:
-            # Draw each point on image
-            new_csv_row = []
-            for coord in coords:
-                x_coord, y_coord = int(coord[0]), int(coord[1])
-                cv2.circle(image_debug, (x_coord, y_coord), 4, (255, 0, 0), 2)
-                new_csv_row.extend([x_coord, y_coord])
-
-        total_then = time.time()
-        text = "{:03.2f} sec".format(total_then - total_now)
-        cv2.putText(image_debug, text, (100, 50), cv2.FONT_HERSHEY_SIMPLEX,
-                    1, (0, 0, 255), 2, cv2.LINE_AA)
-
-        csv_output_rows.append(new_csv_row)
-        img_file = os.path.join(pose_dir, 'pose_{:08d}.jpg'.format(count))
-        cv2.imwrite(img_file, image_debug)
-        outcap.write(image_debug)
-
-    # write csv
-    # csv_headers=['frame']
-    csv_headers = []
-    if cfg.DATASET.DATASET_TEST == 'coco':
-        for keypoint in COCO_KEYPOINT_INDEXES.values():
-            csv_headers.extend([keypoint+'_x', keypoint+'_y'])
-    elif cfg.DATASET.DATASET_TEST == 'crowd_pose':
-        for keypoint in CROWDPOSE_KEYPOINT_INDEXES.values():
-            csv_headers.extend([keypoint+'_x', keypoint+'_y'])
-    else:
-        raise ValueError('Please implement keypoint_index for new dataset: %s.' % cfg.DATASET.DATASET_TEST)
-
-    csv_output_filename = os.path.join(args.outputDir, 'pose-data.csv')
-    with open(csv_output_filename, 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        csvwriter.writerow(csv_headers)
-        csvwriter.writerows(csv_output_rows)
-
-    vidcap.release()
-    outcap.release()
-
-    cv2.destroyAllWindows()
 
 
 def extract_frames():
@@ -384,7 +255,7 @@ def extract_frames():
     update_config(cfg, args)
     pose_dir = prepare_output_dirs(args.outputDir)
 
-    # Loading an video
+    # Loading a video
     vidcap = cv2.VideoCapture(args.videoFile)
     fps = vidcap.get(cv2.CAP_PROP_FPS)
     if fps < args.inferenceFps:
@@ -443,9 +314,6 @@ def compute_bbox(key_points):
     return [(min_x, min_y), (max_x, max_y)]
 
 
-INDEX = 0
-
-
 def draw_bboxes(image_path, b_boxes, offset_x=20, offset_y=80):
     global INDEX
     image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
@@ -454,12 +322,6 @@ def draw_bboxes(image_path, b_boxes, offset_x=20, offset_y=80):
         image = np.array(image)
         cv2.rectangle(image, (b_boxes[i][0][0] - offset_x, b_boxes[i][0][1] - offset_y),
                       (b_boxes[i][1][0] + offset_x, b_boxes[i][1][1] + offset_y), (255, 255, 255), thickness=2)
-        # copy_image = image.copy()
-        # cropped_image = copy_image[(b_boxes[i][0][0] - offset_x):(b_boxes[i][0][1] - offset_y),(b_boxes[i][1][0] + offset_x):(b_boxes[i][1][1] + offset_y)]
-        # image_path_crop = POSE_DIR + str(INDEX) + ".jpg"
-        # INDEX += 1
-        # cv2.imwrite(image_path_crop, cropped_image)
-
     cv2.imwrite(image_path, image)
 
 
@@ -502,13 +364,6 @@ def assign_ids(cameras, pixels, fused_pt, image_paths, ids, frame_id):
                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255),
                                        2, lineType=cv2.LINE_AA)
                     cv2.imwrite(image_paths[i], image)
-
-
-INPUT_DIR = "/media/ana/Multimedia/UbuntuChestii/bodytracking_all/"
-# INPUT_DIR = "/home/anaml/bodytracking/"
-OUTPUT_DIR = "/home/ana/PycharmProjects/DEKR/output/"
-# OUTPUT_DIR = "/home/anaml/DEKR/output/"
-CAMERAS = ["cn01","cn02", "cn03", "cn04", "cn05", "cn06"]
 
 
 def create(frame_id, dir=INPUT_DIR, total_padding=10, ending="_color.jpg"):
@@ -557,5 +412,4 @@ if __name__ == '__main__':
     for frame_id in frame_ids:
         re_identify(frame_id)
 
-    # extract_frames()
 

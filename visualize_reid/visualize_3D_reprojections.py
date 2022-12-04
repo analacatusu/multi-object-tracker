@@ -3,8 +3,8 @@ import numpy as np
 import open3d as o3d
 import open3d.visualization.gui as gui
 import cv2
-from visualize_reID.visualize import render_camera_poses
-from visualize_reID.utils import load_camera_params, unfold_camera_param
+from visualize_reid.visualize import render_camera_poses
+from visuzalize_reid.utils import load_camera_params, unfold_camera_param
 
 DATA_DIR = "/media/ana/Multimedia/UbuntuChestii/bodytracking/"
 CAMERAS = ["cn01", "cn02", "cn03", "cn04", "cn05", "cn06"]
@@ -118,11 +118,6 @@ def fuse_world_points(world_points):
         center_tracks.append(world_points[0])
         ids.append(MAX_ID)
         MAX_ID += 1
-        # fused = fuse(world_points)
-        # center_tracks.append(fused)
-        # ids.append(MAX_ID)
-        # MAX_ID += 1
-        # return fused
 
     to_fuse : dict = init()
     for point in world_points:
@@ -197,33 +192,3 @@ if __name__ == "__main__":
     print(fused_pts)
     visualize(fused_pts, frame_id, multiplePoints=True)
 
-
-    # frame_id = 1100
-    # # center pixels of a person in the frame 1100
-    # pixels = {"cn01": np.array([680, 718]),
-    #           "cn02": np.array([1695, 637]),
-    #           "cn03": np.array([1692, 496]),
-    #           "cn04": np.array([1473, 540])
-    #           }
-    # # visualize the centers on the 2D images
-    # draw_centers()
-    # # reproject the pixels in 3D
-    # world_pts = np.array(construct_world_points(pixels))
-    # # visualize(world_pts, frame_id, multiplePoints=True)
-    # fused_pt = fuse_world_points(world_pts)
-    # print(fused_pt)
-    # # visualize(fused_pt, frame_id)
-    #
-    # frame_id = 1105
-    # # center pixels of a person in the frame 1105
-    # pixels = {"cn01": np.array([676, 713]),
-    #           "cn02": np.array([1705, 639]),
-    #           "cn03": np.array([1705, 492]),
-    #           "cn04": np.array([1474, 537])
-    #           }
-    # # reproject the pixels in 3D
-    # world_pts = np.array(construct_world_points(pixels))
-    # # visualize(world_pts, frame_id, multiplePoints=True)
-    # fused_pts = fuse_world_points(world_pts)
-    # print(fused_pts)
-    # # visualize(fused_pts, frame_id, multiplePoints=True)

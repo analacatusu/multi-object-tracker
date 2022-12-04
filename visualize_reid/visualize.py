@@ -6,8 +6,8 @@ import open3d as o3d
 import open3d.visualization.gui as gui
 import cv2
 
-from visualize_reID.utils import load_camera_params
-from visualize_reID.utils import project_pose, homogenous_to_rot_trans
+from visualize_reid.utils import load_camera_params
+from visualize_reid.utils import project_pose, homogenous_to_rot_trans
 
 DATA_DIR = "/media/ana/Multimedia/UbuntuChestii/bodytracking"
 CAMERAS = ["cn01", "cn02", "cn03", "cn04", "cn05", "cn06"]
