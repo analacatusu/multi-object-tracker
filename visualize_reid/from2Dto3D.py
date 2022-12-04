@@ -64,12 +64,12 @@ def fuse_world_points(world_pts):
         print("error: there are no world points to fuse!")
         return None
 
-    if len(world_pts) == 1:
+  if len(world_pts) == 1:
         return world_pts[0]
 
-    sum = np.sum(world_pts, axis=0)
-    fused_point = sum / len(world_pts)
-    return fused_point
+  sum = np.sum(world_pts, axis=0)
+  fused_point = sum / len(world_pts)
+  return fused_point
 
 
 
