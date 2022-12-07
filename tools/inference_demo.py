@@ -175,7 +175,6 @@ def parse_args():
     args.prevModelDir = ''
     return args
 
-
 def main(image_path, camera):
     # transformation
     pose_transform = transforms.Compose([
@@ -248,9 +247,8 @@ def main(image_path, camera):
 
     return img_file
 
-
+# extract frames from a video
 def extract_frames():
-
     args = parse_args()
     update_config(cfg, args)
     pose_dir = prepare_output_dirs(args.outputDir)
@@ -342,7 +340,6 @@ def read_csv(image_path, csv_path, camera, pixels):
     pixels[camera] = centers
     return pixels
 
-
 def find_id_position(point, fused_points):
     human_width = 0.57
     for i, pt in enumerate(fused_points):
@@ -366,10 +363,11 @@ def assign_ids(cameras, pixels, fused_pt, image_paths, ids, frame_id):
                     cv2.imwrite(image_paths[i], image)
 
 
+# get one frame from each of the cameras
 def create(frame_id, dir=INPUT_DIR, total_padding=10, ending="_color.jpg"):
     image_paths = []
     frame = frame_id.zfill(total_padding)
-    frame = frame+ ending
+    frame = frame + ending
     for cam in CAMERAS:
         image_paths.append(os.path.join(dir, cam, frame))
     return image_paths
@@ -387,6 +385,7 @@ def re_identify(frame_id):
     image_paths_input = create(frame_id)
     image_paths_input = zip(image_paths_input, CAMERAS)
     image_paths_output = []
+    # use DEKR to predict key points on the images
     for image_path, camera in image_paths_input:
         image_paths_output.append(main(image_path, camera))
 
@@ -397,12 +396,14 @@ def re_identify(frame_id):
 
     for image_path, csv_path, camera in image_paths_output_zipped:
         pixels = read_csv(image_path, csv_path, camera, pixels)
-
+    
+    # re-project in 3D
     world_pts = np.array(construct_world_points(pixels, frame_id))
     # visualize(world_pts, frame_id, multiplePoints=True)
+    # fuse points in 3D
     fused_pts, ids = fuse_world_points(world_pts)
     # visualize(fused_pts, frame_id, multiplePoints=True)
-
+    # assign ids by comparing against the labeled fused points in 3D
     assign_ids(CAMERAS, pixels, fused_pts, image_paths_output, ids, frame_id)
 
 
